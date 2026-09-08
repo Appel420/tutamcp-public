@@ -1,0 +1,75 @@
+name: Sovereignty CD
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  RUNNER_VERSION: "2.337.0"
+  RUNNER_ARCHIVE: "actions-runner-linux-arm64-2.337.0.tar.gz"
+
+jobs:
+  cd-sovereign:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Verify runner
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          echo "OS=${RUNNER_OS}"
+          echo "ARCH=${RUNNER_ARCH}"
+
+          [[ "${RUNNER_OS}" == "Linux" ]] || {
+            echo "ERROR: Linux runner required." >&2
+            exit 1
+          }
+
+          [[ "${RUNNER_ARCH}" == "ARM64" ]] || {
+            echo "ERROR: ARM64 runner required." >&2
+            exit 1
+          }
+
+      - name: Download GitHub Actions ARM64 runner
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          RUNNER_URL="https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/${RUNNER_ARCHIVE}"
+
+          mkdir -p "${RUNNER_TEMP}/sovereignty-runner"
+          cd "${RUNNER_TEMP}/sovereignty-runner"
+
+          rm -f "${RUNNER_ARCHIVE}"
+
+          curl \
+            --fail \
+            --location \
+            --show-error \
+            --silent \
+            --retry 3 \
+            --retry-delay 2 \
+            --proto '=https' \
+            --tlsv1.2 \
+            --output "${RUNNER_ARCHIVE}" \
+            "${RUNNER_URL}"
+
+          test -s "${RUNNER_ARCHIVE}"
+          echo "Downloaded:"
+          ls -lh "${RUNNER_ARCHIVE}"
+
+      - name: Validate runner archive
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          cd "${RUNNER_TEMP}/sovereignty-runner"
+
+          tar --extract --gzip --file "${RUNNER_ARCHIVE}"
+
+          test -x ./run.sh
+          test -f ./bin/Runner.Listener
+          file ./bin/Runner.Listener || true
