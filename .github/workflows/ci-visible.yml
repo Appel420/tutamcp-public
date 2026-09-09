@@ -1,0 +1,132 @@
+name: CI Visible
+
+on:
+  push:
+    branches: [main, Collaboration, recovery/visible-actions]
+  pull_request:
+    branches: [main, Collaboration]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TUTAPROXY_REF: v1.3.15
+
+jobs:
+  verify:
+    name: 1. Verify source and toolchain
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Fetch exact commit
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git init repo
+          cd repo
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --depth=1 origin "${GITHUB_SHA}"
+          git checkout --detach FETCH_HEAD
+          git status --short --branch
+
+      - name: Verify toolchain
+        shell: bash
+        working-directory: repo
+        run: |
+          set -Eeuo pipefail
+          python3 --version
+          python3 -m pip --version
+          git --version
+          uname -a
+          uname -m
+
+  tests:
+    name: 2. Compile and run unit tests
+    runs-on: ubuntu-24.04-arm
+    needs: verify
+    steps:
+      - name: Fetch exact commit
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git init repo
+          cd repo
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --depth=1 origin "${GITHUB_SHA}"
+          git checkout --detach FETCH_HEAD
+
+      - name: Install dependencies
+        shell: bash
+        working-directory: repo
+        run: |
+          set -Eeuo pipefail
+          git clone --depth 1 --branch "${TUTAPROXY_REF}" https://github.com/peix2/tutaproxy-public.git ../tutaproxy-public
+          python3 -m pip install --disable-pip-version-check --no-cache-dir -r requirements.txt
+          python3 -m pip install --disable-pip-version-check --no-cache-dir -e ../tutaproxy-public
+
+      - name: Compile Python sources
+        shell: bash
+        working-directory: repo
+        run: python3 -m compileall -q server.py run.py tutamcp tests
+
+      - name: Run unit tests
+        shell: bash
+        working-directory: repo
+        run: python3 tests/run_all.py
+
+  docker:
+    name: 3. Build Docker image
+    runs-on: ubuntu-24.04-arm
+    needs: tests
+    steps:
+      - name: Fetch exact commit
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git init repo
+          cd repo
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --depth=1 origin "${GITHUB_SHA}"
+          git checkout --detach FETCH_HEAD
+
+      - name: Build image
+        shell: bash
+        working-directory: repo
+        run: |
+          set -Eeuo pipefail
+          docker build --build-arg TUTAPROXY_REF="${TUTAPROXY_REF}" --tag tutamcp:ci .
+
+      - name: Verify image
+        shell: bash
+        working-directory: repo
+        run: |
+          set -Eeuo pipefail
+          docker image inspect tutamcp:ci --format 'OS={{.Os}} ARCH={{.Architecture}}'
+
+  server-smoke:
+    name: 4. Server import smoke test
+    runs-on: ubuntu-24.04-arm
+    needs: tests
+    steps:
+      - name: Fetch exact commit
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git init repo
+          cd repo
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --depth=1 origin "${GITHUB_SHA}"
+          git checkout --detach FETCH_HEAD
+
+      - name: Install tutaproxy and test import
+        shell: bash
+        working-directory: repo
+        run: |
+          set -Eeuo pipefail
+          git clone --depth 1 --branch "${TUTAPROXY_REF}" https://github.com/peix2/tutaproxy-public.git ../tutaproxy-public
+          python3 -m pip install --disable-pip-version-check --no-cache-dir -r requirements.txt
+          python3 -m pip install --disable-pip-version-check --no-cache-dir -e ../tutaproxy-public
+          python3 - <<'PY'
+          import server
+          print('server import: OK')
+          PY
