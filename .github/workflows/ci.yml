@@ -2,9 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: 
+     - main
   pull_request:
-    branches: [main]
+    branches: 
+     - main
   workflow_dispatch:
 
 permissions:
@@ -15,7 +17,7 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ['ubuntu-latest,self-hosted, macos, arm64']
     steps:
       - name: Checkout repository
         shell: bash
@@ -71,7 +73,7 @@ jobs:
           PY
 
   docker:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ['ubuntu-lstedt, self-hosted, macos' arm64']
     needs: test
     steps:
       - name: Checkout repository
