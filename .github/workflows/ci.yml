@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    runs-on: [self-hosted, macos, arm64]
+    runs-on: ['ubuntu-latest,self-hosted, macos, arm64']
     steps:
       - name: Checkout repository
         shell: bash
@@ -62,7 +62,7 @@ jobs:
           python3 tests/run_all.py
 
   docker:
-    runs-on: ['self-hosted, macos, arm64']
+    runs-on: ['ubuntu-latest, self-hosted, macos, arm64']
     needs: test
     steps:
       - name: Checkout repository
